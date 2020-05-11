@@ -1,0 +1,154 @@
+<html>
+  <head>
+    <style>
+      * { font-family: Calibri, sans-serif; }
+      .crossedout { text-decoration: line-through; }
+      .root { margin-top: 0; }
+      .indented { margin-left: 12px; }
+      h1 { margin-bottom: 6px; }
+      h2 { margin-bottom: 6px; }
+      h3 { margin-bottom: 6px; }
+      h4 { margin-bottom: 6px; }
+      div > h2:first-child, div > h3:first-child, div > h4:first-child, div > h5:first-child { margin-top: 0; }
+      h1 + h2, h2 + h3, h3 + h4, h4 + h5 { margin-top: 0; }
+      h1 + p, h2 + p, h3 + p, h4 + p, h5 + p { margin-top: 0; }
+      h1 + ol, h2 + ol, h3 + ol, h4 + ol, h5 + ol { margin-top: 0; }
+      h1 + ul, h2 + ul, h3 + ul, h4 + ul, h5 + ul { margin-top: 0; }
+    </style>
+  </head>
+  <body>
+    <h1 class="root">Process Changes Report for Process CompareProcess</h1>
+    <p>
+      This report describes all changes between the process CompareProcess and its base process.
+      <br />
+      Generated: 04/20/2020 15:08:42
+    </p>
+    <h2>General Information</h2>
+    <ul>
+      <li><strong>Process Name:</strong> CompareProcess</li>
+      <li><strong>Description:</strong> </li>
+      <li><strong>Base Process:</strong> Scrum</li>
+      <li><strong>Projects:</strong> None</li>
+    </ul>
+    <h2>Work Item Types</h2>
+    <p>
+      This section lists all custom, changed, and disabled work item types. Work item types that match the definition in the base process are not listed to keep the report short. For each work item type all states, all custom or changed fields, and custom rules are listed.
+    </p>
+    <div class="indented">
+      <h3>Disabled Work Item Types</h3>
+      <ul>
+        <li>Task</li>
+      </ul>
+      <h3>Product Backlog Item (changed)</h3>
+      <div class="indented">
+        <h4>States</h4>
+        <p>
+          States in regular print match the base process definition, <strong>bold</strong> states have been added, <span class='crossedout'>crossed out</span> states have been hidden.
+        </p>
+        <ul>
+          <li>New (Proposed)</li>
+          <li><span class='crossedout'>Approved</span> (Proposed)</li>
+          <li>Committed (InProgress)</li>
+          <li><strong>Resolved</strong> (Resolved)</li>
+          <li>Done (Completed)</li>
+          <li>Removed (Removed)</li>
+        </ul>
+        <h4>Fields</h4>
+        <p>
+          Fields in <strong>bold</strong> print are custom, changed fields are printed in regular text. For custom fields, all properties are listed, whereas for changed fields only changed properties are listed.
+        </p>
+        <ul>
+          <li>Priority</li>
+          <ul>
+            <li>description: <span class='crossedout'>Priority for completing the backlog item, based on business goals</span> </li>
+            <li>defaultValue: <span class='crossedout'>2</span></li>
+          </ul>
+          <li>Effort</li>
+          <ul>
+            <li>description: <span class='crossedout'>The estimated effort to implemented the backlog item</span> </li>
+            <li>required: True</li>
+          </ul>
+          <li><strong>NewField</strong></li>
+          <ul>
+            <li>type: string</li>
+            <li>description: </li>
+          </ul>
+          <li><strong>NewListField</strong></li>
+          <ul>
+            <li>type: string</li>
+            <li>description: </li>
+            <li>required: True</li>
+            <li>defaultValue: Value A</li>
+          </ul>
+          <li><strong>CustomIdentity</strong></li>
+          <ul>
+            <li>type: string</li>
+            <li>description: </li>
+            <li>required: True</li>
+            <li>defaultValue: $currentUser</li>
+          </ul>
+        </ul>
+        <h4>Rules</h4>
+        <ul>
+          <li><strong>Name:</strong> NewRule</li>
+          <li><strong>Conditions</strong></li>
+          <ul>
+            <li><strong>Type:</strong> whenChanged; <strong>Field:</strong> System.State; <strong>Value:</strong> </li>
+            <li><strong>Type:</strong> when; <strong>Field:</strong> System.State; <strong>Value:</strong> Resolved</li>
+          </ul>
+          <li><strong>Actions</strong></li>
+          <ul>
+            <li><strong>Action:</strong> makeReadOnly; <strong>Target Field:</strong> System.Description; <strong>Value:</strong> </li>
+          </ul>
+        </ul>
+      </div>
+      <h3>NewWorkItemType (custom)</h3>
+      <div class="indented">
+        <h4>States</h4>
+        <p>
+          States in regular print match the base process definition, <strong>bold</strong> states have been added, <span class='crossedout'>crossed out</span> states have been hidden.
+        </p>
+        <ul>
+          <li><strong>New</strong> (Proposed)</li>
+          <li><strong>Committed</strong> (InProgress)</li>
+          <li><strong>Done</strong> (Completed)</li>
+        </ul>
+        <h4>Fields</h4>
+        <p>
+          Fields in <strong>bold</strong> print are custom, changed fields are printed in regular text. For custom fields, all properties are listed, whereas for changed fields only changed properties are listed.
+        </p>
+        <ul>
+          <li><strong>State</strong></li>
+          <ul>
+            <li>type: string</li>
+            <li>required: True</li>
+            <li>defaultValue: New</li>
+          </ul>
+          <li><strong>Reason</strong></li>
+          <ul>
+            <li>type: string</li>
+          </ul>
+          <li><strong>State Change Date</strong></li>
+          <ul>
+            <li>type: dateTime</li>
+            <li>description: </li>
+          </ul>
+          <li><strong>Closed Date</strong></li>
+          <ul>
+            <li>type: dateTime</li>
+            <li>description: </li>
+          </ul>
+          <li><strong>Closed By</strong></li>
+          <ul>
+            <li>type: string</li>
+            <li>description: </li>
+          </ul>
+        </ul>
+        <h4>Rules</h4>
+        <ul>
+          <li>None</li>
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>
