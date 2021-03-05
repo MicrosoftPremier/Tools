@@ -18,6 +18,9 @@
 .PARAMETER UsePAT
     Specify this switch if you need to provide a Personal Access Token to connect your Azure DevOps Server/Services.
 
+.PARAMETER AllowHttp
+    Specify this switch if you need connect to Azure DevOps over unencrypted http (not https).
+
 .PARAMETER MaxRestCallRetries
     Provide the number of retries for failing REST calls. In general, you shouldn't need this option. However, when running in an
     unstable environment (e.g., unreliable network connection), retries can help by automatically rerunning failing REST calls.
@@ -53,6 +56,9 @@ param (
 
     [Parameter(Mandatory=$false, HelpMessage="Specify this switch if you need to provide a Personal Access Token to connect your Azure DevOps Server/Services.")]
     [switch]$UsePAT,
+
+    [Parameter(Mandatory=$false, HelpMessage="Specify this switch if you need connect to Azure DevOps over unencrypted http (not https).")]
+    [switch]$AllowHttp,
 
     [Parameter(Mandatory=$false, HelpMessage="Provide the number of retries for failing REST calls. In general, you shouldn't need this option.")]
     [int]$MaxRestCallRetries = 1,
@@ -94,6 +100,7 @@ function Test-Parameters()
     # Add your own parameters and parameter validations here
 
     Write-Host "Authentication: $(if ($UsePAT) { "PAT" } elseif ($GetCredentials) { "Custom Credentials" } else { "Default Credentials" })"
+    Write-Host "     Allow HTTP: $AllowHttp"
     $Global:isQuiet = $Quiet
     Write-Host "         Quiet: $Quiet"
     Write-Host "   Max Retries: $MaxRestCallRetries" -NoNewline
@@ -155,6 +162,27 @@ function Get-Consent([string] $message)
         "a" { $Global:quietAnswer = $true; $Global:isQuiet = $true; return $true }
         "n" { return $false }
         "l" { $Global:quietAnswer = $false; $Global:isQuiet = $true; return $false }
+        default { return $Global:defaultAnswer }
+    }
+}
+
+function Get-SpecialConsent([string] $message)
+{
+    Write-Host "$message" -ForegroundColor Red
+    if ($Global:defaultAnswer) {
+        Write-Host "[Y] Yes" -ForegroundColor Yellow -NoNewline
+        Write-Host "  [N] No  (default is `"Y`"): " -NoNewline
+    }
+    else
+    {
+        Write-Host "[Y] Yes  " -NoNewline
+        Write-Host "[N] No" -ForegroundColor Yellow -NoNewline
+        Write-Host "  (default is `"N`"): " -NoNewline
+    }
+    switch (Read-Host)
+    {
+        "y" { $true }
+        "n" { return $false }
         default { return $Global:defaultAnswer }
     }
 }
@@ -266,17 +294,29 @@ function Invoke-RestGet($uri, [ref]$responseHeader)
 
 function Invoke-RestPost($uri, $body, [ref]$responseHeader)
 {
-    Invoke-RestWithBody $uri "Post" $body ([ref]$responseHeader)
+    if ($null -eq $body) {
+        Invoke-Rest $uri "Post" ([ref]$responseHeader)
+    } else {
+        Invoke-RestWithBody $uri "Post" $body ([ref]$responseHeader)
+    }
 }
 
 function Invoke-RestPut($uri, $body, [ref]$responseHeader)
 {
-    Invoke-RestWithBody $uri "Put" $body ([ref]$responseHeader)
+    if ($null -eq $body) {
+        Invoke-Rest $uri "Put" ([ref]$responseHeader)
+    } else {
+        Invoke-RestWithBody $uri "Put" $body ([ref]$responseHeader)
+    }
 }
 
 function Invoke-RestPatch($uri, $body, [ref]$responseHeader)
 {
-    Invoke-RestWithBody $uri "Patch" $body ([ref]$responseHeader)
+    if ($null -eq $body) {
+        Invoke-Rest $uri "Patch" ([ref]$responseHeader)
+    } else {
+        Invoke-RestWithBody $uri "Patch" $body ([ref]$responseHeader)
+    }
 }
 
 function Invoke-RestDelete($uri, [ref]$responseHeader)
@@ -368,15 +408,15 @@ function Invoke-Rest($uri, $method, [ref]$responseHeader)
 
     if ($UsePAT)
     {
-        return Invoke-RestMethod $uri -Method $method -Headers $Global:headers -ResponseHeadersVariable "responseHeaderValue"
+        return Invoke-RestMethod $uri -Method $method -Headers $Global:headers -ResponseHeadersVariable "responseHeaderValue" -AllowUnencrypted:$AllowHttp
     }
     elseif ($GetCredentials)
     {
-        return Invoke-RestMethod $uri -Method $method -Headers $Global:headers -Credential $Global:credentials -ResponseHeadersVariable "responseHeaderValue"
+        return Invoke-RestMethod $uri -Method $method -Headers $Global:headers -Credential $Global:credentials -ResponseHeadersVariable "responseHeaderValue" -AllowUnencrypted:$AllowHttp
     }
     else
     {
-        return Invoke-RestMethod $uri -Method $method -Headers $Global:headers -UseDefaultCredentials -ResponseHeadersVariable "responseHeaderValue"
+        return Invoke-RestMethod $uri -Method $method -Headers $Global:headers -UseDefaultCredentials -ResponseHeadersVariable "responseHeaderValue" -AllowUnencrypted:$AllowHttp
     }
 
     if ($responseHeader) {
@@ -393,15 +433,15 @@ function Invoke-RestWithBody($uri, $method, $body, [ref]$responseHeader)
     
     if ($UsePAT)
     {
-        return Invoke-RestMethod $uri -Method $method -Headers $Global:headers -ContentType "application/json" -Body ([System.Text.Encoding]::UTF8.GetBytes($jsonBody)) -ResponseHeadersVariable "responseHeaderValue"
+        return Invoke-RestMethod $uri -Method $method -Headers $Global:headers -ContentType "application/json" -Body ([System.Text.Encoding]::UTF8.GetBytes($jsonBody)) -ResponseHeadersVariable "responseHeaderValue" -AllowUnencrypted:$AllowHttp
     }
     elseif ($GetCredentials)
     {
-        return Invoke-RestMethod $uri -Method $method -Headers $Global:headers -ContentType "application/json" -Body ([System.Text.Encoding]::UTF8.GetBytes($jsonBody)) -Credential $Global:credentials -ResponseHeadersVariable "responseHeaderValue"
+        return Invoke-RestMethod $uri -Method $method -Headers $Global:headers -ContentType "application/json" -Body ([System.Text.Encoding]::UTF8.GetBytes($jsonBody)) -Credential $Global:credentials -ResponseHeadersVariable "responseHeaderValue" -AllowUnencrypted:$AllowHttp
     }
     else
     {
-        return Invoke-RestMethod $uri -Method $method -Headers $Global:headers -ContentType "application/json" -Body ([System.Text.Encoding]::UTF8.GetBytes($jsonBody)) -UseDefaultCredentials -ResponseHeadersVariable "responseHeaderValue"
+        return Invoke-RestMethod $uri -Method $method -Headers $Global:headers -ContentType "application/json" -Body ([System.Text.Encoding]::UTF8.GetBytes($jsonBody)) -UseDefaultCredentials -ResponseHeadersVariable "responseHeaderValue" -AllowUnencrypted:$AllowHttp
     }
 
     if ($responseHeader) {
