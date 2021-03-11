@@ -478,12 +478,14 @@ $projectSecNamespaceId = "52d39943-cb85-4d7f-8fa8-c6baac873819"
 $taggingSecNamespaceId = "bb50f182-8e5e-40b8-bc21-e8752a1e7ae2"
 $cssSecNamespaceId = "83e28ad4-2d72-4ceb-97b0-c7726d5502c3"
 $gitSecNamespaceId = "2e9eb7ed-3c0a-47d4-87c1-0ffdd275fd87"
+$tfvcSecNamespaceId = "a39371cf-0841-4c16-bbd3-276e341bc052"
 
 $projectLevelReaderAllow = 513
 $projectLevelTeamsAllow = 1
 $taggingAllow = 1
 $rootAreaAllow = 17
 $gitAllow = 2
+$tfvcAllow = 1
 
 function Get-Projects() {
     $projectInformation = New-Object System.Collections.ArrayList
@@ -779,12 +781,27 @@ function Restore-GitPermissions($projectId) {
     }
 }
 
+function Restore-TfvcPermissions($projectInfo) {
+    Write-Host "      TFVC repository"
+
+    $token = "`$/$($projectInfo.Name)"
+    $acls = Get-AzDOAcls $tfvcSecNamespaceId $token
+    foreach ($acl in $acls) {
+        if ($acl.token -eq $token) {
+            Set-AzDOAce $tfvcSecNamespaceId $token $true "$($Global:readersGroup.IdentityType);$($Global:readersGroup.Descriptor)" $tfvcAllow
+        } else {
+            Set-AzDOAcl $tfvcSecNamespaceId $acl.token $true @{}
+        }
+    }
+}
+
 function Restore-DefaultPermissions($projectInfo, $teams) {
     Write-Host "   Fixing permissions for project '$($projectInfo.Name)'..."
 
     Restore-GroupPermissions $projectInfo.Id
     Restore-AreaPermissions $projectInfo.Id
     Restore-GitPermissions $projectInfo.Id
+    Restore-TfvcPermissions $projectInfo
 }
 
 ################################################################################
