@@ -96,7 +96,7 @@ Set-StrictMode -Version 3.0
 
 $scriptName = "Remove Write Permissions"
 # Use semantic versioning here
-$version = "1.2.0"
+$version = "1.2.1"
 $year = "2020"
 
 $Global:quietAnswer = $true
@@ -489,7 +489,7 @@ $tfvcAllow = 1
 
 function Get-Projects() {
     $projectInformation = New-Object System.Collections.ArrayList
-    $projectsUri = "$ServiceUri/_apis/projects"
+    $projectsUri = "$ServiceUri/_apis/projects?`$top=999"
     $result = Invoke-RestGet $projectsUri
 
     $selectedProjects = @()
