@@ -12,14 +12,21 @@
 .PARAMETER Projects
     Enter a comma-separated list of projects from which you want to remove write permissions. If omitted, permissions will be removed from all projects.
 
+.PARAMETER ExludeProjects
+    Enter a comma-separated list of projects you want to exclude from the script run.
+
 .PARAMETER RemoveProjectAdmins
     Specify this switch to remove all project administrators from projects.
 
+.PARAMETER RemoveAllAccess
+    Specify this switch to remove all access to the projects. If you combine this flag with the RemoveProjectAdmins and FixPermissions flags, only collection
+    and server administrators will be able to access the projects.
+
 .PARAMETER FixPermissions
-    Specify this switch to fix project permissions. To minimize the effort and runtime for the script, this parameter only ensures the following:
-      - Ensure that project-level permissions of the Readers group are correct.
-      - Remove all direct permissions on all areas, enable inheritance, ensure that permissions of the Readers group are correct.
-      - Remove all direct permissions on all Git repositories and refs, enable inheritance, ensure that permissions of the Readers group are correct.
+    Specify this switch to fix project permissions.
+
+.PARAMETER SkiptTfvcPermissions
+    Specify this switch to skip fixing TFVC permissions.
 
 .PARAMETER Quiet
     Specify this switch to suppress confirmation prompts.
@@ -61,11 +68,20 @@ param (
     [Parameter(Mandatory=$false, HelpMessage="Enter a comma-separated list of projects from which you want to remove write permissions. If omitted, permissions will be removed from all projects.")]
     [string]$Projects,
 
+    [Parameter(Mandatory=$false, HelpMessage="Enter a comma-separated list of projects you want to exclude from the script run.")]
+    [string]$ExludeProjects,
+
     [Parameter(Mandatory=$false, HelpMessage="Specify this switch to remove all project administrators from projects.")]
     [switch]$RemoveProjectAdmins,
 
-    [Parameter(Mandatory=$false, HelpMessage="Specify this switch to fix project permissions (see help details).")]
+    [Parameter(Mandatory=$false, HelpMessage="Specify this switch to remove all access to the projects. If you combine this flag with the RemoveProjectAdmins and FixPermissions flags, only collection and server administrators will be able to access the projects.")]
+    [switch]$RemoveAllAccess,
+
+    [Parameter(Mandatory=$false, HelpMessage="Specify this switch to fix project permissions.")]
     [switch]$FixPermissions,
+
+    [Parameter(Mandatory=$false, HelpMessage="Specify this switch to skip fixing TFVC permissions.")]
+    [switch]$SkipTfvcPermissions,
 
     [Parameter(Mandatory=$false, HelpMessage="Specify this switch to suppress confirmation prompts.")]
     [switch]$Quiet,
@@ -96,7 +112,7 @@ Set-StrictMode -Version 3.0
 
 $scriptName = "Remove Write Permissions"
 # Use semantic versioning here
-$version = "1.2.1"
+$version = "1.4.0"
 $year = "2020"
 
 $Global:quietAnswer = $true
@@ -108,7 +124,7 @@ function Test-Parameters()
 {
     $validationResult = $true;
 
-    Write-Host "        Service: $ServiceUri" -NoNewline
+    Write-Host "          Service: $ServiceUri" -NoNewline
     if (!([System.Uri]::IsWellFormedUriString($ServiceUri, [System.UriKind]::Absolute)))
     {
         Write-Host " (invalid)" -ForegroundColor Red -NoNewline
@@ -116,21 +132,24 @@ function Test-Parameters()
     }
     Write-Host
 
-    Write-Host "       Projects: $(if ([string]::IsNullOrEmpty($Projects.Trim())) { "All" } else { $Projects.Trim() })"
-    Write-Host "  Remove Admins: $RemoveProjectAdmins"
-    Write-Host "Fix Permissions: $FixPermissions"
+    Write-Host "         Projects: $(if ([string]::IsNullOrEmpty($Projects.Trim())) { "All" } else { $Projects.Trim() })"
+    Write-Host "Excluded Projects: $(if ([string]::IsNullOrEmpty($ExludeProjects.Trim())) { "None" } else { $ExludeProjects.Trim() })"
+    Write-Host "    Remove Admins: $RemoveProjectAdmins"
+    Write-Host "Remove All Access: $RemoveAllAccess"
+    Write-Host "  Fix Permissions: $FixPermissions"
+    Write-Host "        Skip TFVC: $SkipTfvcPermissions"
 
-    Write-Host " Authentication: $(if ($UsePAT) { "PAT" } elseif ($GetCredentials) { "Custom Credentials" } else { "Default Credentials" })"
-    Write-Host "     Allow HTTP: $AllowHttp"
+    Write-Host "   Authentication: $(if ($UsePAT) { "PAT" } elseif ($GetCredentials) { "Custom Credentials" } else { "Default Credentials" })"
+    Write-Host "       Allow HTTP: $AllowHttp"
     $Global:isQuiet = $Quiet
-    Write-Host "          Quiet: $Quiet"
-    Write-Host "    Max Retries: $MaxRestCallRetries" -NoNewline
+    Write-Host "            Quiet: $Quiet"
+    Write-Host "      Max Retries: $MaxRestCallRetries" -NoNewline
     if ($MaxRestCallRetries -lt 1) {
         Write-Host " (invalid)" -ForegroundColor Red -NoNewline
         $validationResult = $false;
     }
     Write-Host
-    Write-Host "   Trace Errors: $TraceErrors"
+    Write-Host "     Trace Errors: $TraceErrors"
     Write-Host "--------------------------------------------------------------------------------"
 
     return $validationResult
@@ -479,6 +498,9 @@ $taggingSecNamespaceId = "bb50f182-8e5e-40b8-bc21-e8752a1e7ae2"
 $cssSecNamespaceId = "83e28ad4-2d72-4ceb-97b0-c7726d5502c3"
 $gitSecNamespaceId = "2e9eb7ed-3c0a-47d4-87c1-0ffdd275fd87"
 $tfvcSecNamespaceId = "a39371cf-0841-4c16-bbd3-276e341bc052"
+$queryFoldersSecNamespaceId = "71356614-aad7-4757-8f2c-0fb3bff6f680"
+$buildSecNamespaceId = "33344d9c-fc72-4d6f-aba5-fa317101a7e9"
+$releaseMgmtSecNamespaceId = "c788c23e-1b46-4162-8f5e-d7585343b5de"
 
 $projectLevelReaderAllow = 513
 $projectLevelTeamsAllow = 1
@@ -486,6 +508,9 @@ $taggingAllow = 1
 $rootAreaAllow = 17
 $gitAllow = 2
 $tfvcAllow = 1
+$queryFolderAllow = 1
+$buildAllow = 1025
+$releaseAllow = 33
 
 function Get-Projects() {
     $projectInformation = New-Object System.Collections.ArrayList
@@ -494,15 +519,24 @@ function Get-Projects() {
 
     $selectedProjects = @()
     if (![string]::IsNullOrEmpty($Projects.Trim())) {
-        $projs = $Projects.Split(",", [System.StringSplitOptions]::RemoveEmptyEntries)
+        $projs = $Projects.Trim().Split(",", [System.StringSplitOptions]::RemoveEmptyEntries)
         foreach ($p in $projs) {
-            $selectedProjects += $p.ToLower()
+            $selectedProjects += $p.ToLower().Trim()
+        }
+    }
+    $excludedProjects = @()
+    if (![string]::IsNullOrEmpty($ExludeProjects.Trim())) {
+        $projs = $ExludeProjects.Trim().Split(",", [System.StringSplitOptions]::RemoveEmptyEntries)
+        foreach ($p in $projs) {
+            $excludedProjects += $p.ToLower().Trim()
         }
     }
     foreach ($p in $result.value)
     {
         if (($selectedProjects.Length -eq 0) -or ($selectedProjects.Contains($p.Name.ToLower()))) {
-            $projectInformation.Add((New-Object PSObject -Property @{ Name=$p.name; Id=$p.id })) | Out-Null
+            if (($excludedProjects.Length -eq 0) -or (!$excludedProjects.Contains($p.Name.ToLower()))) {
+                $projectInformation.Add((New-Object PSObject -Property @{ Name=$p.name; Id=$p.id })) | Out-Null
+            }
         }
     }
 
@@ -561,9 +595,11 @@ function Get-GroupMembers($groupId) {
     return Invoke-RestGet $membersUri
 }
 
-function Get-Areas($projectId) {
-    $areasUri = "$ServiceUri/$projectId/_apis/wit/classificationnodes/areas?`$depth=999"
-    return Invoke-RestGet $areasUri
+function Get-RootAreaToken($projectId) {
+    $areasUri = "$ServiceUri/$projectId/_apis/wit/classificationnodes/areas"
+    $result = Invoke-RestGet $areasUri
+
+    return "vstfs:///Classification/Node/$($result.identifier)"
 }
 
 function Get-GitRepositories($projectId) {
@@ -576,6 +612,21 @@ function Get-GitRepositories($projectId) {
     }
 
     return ,$repoInfo
+}
+
+function Get-ProjectWiki($projectId) {
+    $wikiUri = "$ServiceUri/$projectId/_apis/wiki/wikis"
+    $result = Invoke-RestGet $wikiUri
+
+    return ($result.value | Where-Object { $_.type -eq "projectWiki" })
+}
+
+function Get-SharedQueriesFolderToken($projectId) {
+    $queryFolderUri = "$ServiceUri/$projectId/_apis/wit/queries"
+    $result = Invoke-RestGet $queryFolderUri
+
+    $sharedQueriesFolder = ($result.value | Where-Object { $_.path.ToLower() -eq "shared queries" })
+    return "`$/$projectId/$($sharedQueriesFolder.id)"
 }
 
 function Get-AzDOAcl($securityNamespace, $token) {
@@ -680,6 +731,62 @@ function Move-AllMembersToReaders($projectInfo) {
     return $true
 }
 
+function Remove-MembersFromGroup($group) {
+    $members = Get-GroupMembers $group.Id
+    if ($members.Length -eq 0) {
+        return
+    }
+
+    Write-Host "         $($group.Name): $($members.Length) members"
+    foreach ($m in $members) {
+        $removeMemberUri = "$ServiceUri/_apis/identities/$($group.Id)/members/$m"
+        Invoke-RestDelete $removeMemberUri | Out-Null
+    }
+}
+
+function Remove-AllAccess($projectInfo) {
+    Write-Host "      Removing all access from project"
+
+    $groupsToIgnore = @(
+        "project valid users"
+    )
+
+    $allGroups = Get-ProjectGroups $projectInfo.Id
+    Get-Teams $projectInfo.Id
+    Find-ReadersGroup $allGroups
+    if ($null -eq $Global:readersGroup) {
+        Write-Host "WARNING: No Readers group found!" -ForegroundColor Yellow
+        return $false
+    }
+    Set-TeamDescriptorsFromGroupInfos $allGroups
+
+    foreach ($g in $allGroups) {
+        $groupName = $g.Name.ToLower()
+        if ($groupsToIgnore.Contains($groupName)) {
+            continue
+        }
+        if (($groupName -ne "project administrators") -or (($groupName -eq "project administrators") -and $RemoveProjectAdmins)) {
+            Remove-MembersFromGroup $g
+        }
+    }
+    return $true
+}
+
+function Restore-HierarchyPermissions($secNamespaceId, $rootToken, $readersAllow) {
+    $acls = Get-AzDOAcls $secNamespaceId $rootToken
+
+    Write-Host "         Fixing $($acls.Length) ACL(s)"
+    foreach ($acl in $acls) {
+        if ($acl.token -eq $rootToken) {
+            $aces = Remove-NonServerAndTeamIdentities $acl.acesDictionary
+            Set-AzDOAcl $secNamespaceId $acl.token $true $aces
+            Set-AzDOAce $secNamespaceId $acl.token $false "$($Global:readersGroup.IdentityType);$($Global:readersGroup.Descriptor)" $readersAllow
+        } else {
+            Set-AzDOAcl $secNamespaceId $acl.token $true @{}
+        }
+    }
+}
+
 function Restore-ProjectLevelGroupPermissions($projectId, $group, $allow = 0, $deny = 0) {
     Write-Host "         $($group.Name)"
 
@@ -703,96 +810,49 @@ function Restore-GroupPermissions($projectId) {
     Restore-TaggingPermissions $projectInfo.Id $Global:readersGroup $taggingAllow
 }
 
-function Restore-RootAreaPermissions($projectId, $areaId) {
-    Write-Host "         Root area"
-
-    $token = "vstfs:///Classification/Node/$areaId"
-    $acl = Get-AzDOAcl $cssSecNamespaceId $token
-    if ($null -eq $acl) {
-        Write-Host "         WARNING: No ACL found for root area!" -ForegroundColor Yellow
-        return
-    }
-
-    $aces = Remove-NonServerAndTeamIdentities $acl.acesDictionary
-    Set-AzDOAcl $cssSecNamespaceId $token $true $aces
-    Set-AzDOAce $cssSecNamespaceId $token $false "$($Global:readersGroup.IdentityType);$($Global:readersGroup.Descriptor)" $rootAreaAllow
-}
-
-function Restore-InheritedAreaPermissions($projectId, $area, $parentAreaName, $parentAreaToken) {
-    $areaName = "$parentAreaName\\$($area.name)"
-    $areaToken = "$parentAreaToken`:vstfs:///Classification/Node/$($area.identifier)"
-    
-    Write-Host "         $areaName"
-    Set-AzDOAcl $cssSecNamespaceId $areaToken $true @{}
-
-    if ($area.hasChildren) {
-        foreach ($childArea in $area.children) {
-            Restore-InheritedAreaPermissions $projectId $childArea $areaName $areaToken
-        }
-    }
-}
-
 function Restore-AreaPermissions($projectId) {
     Write-Host "      Areas"
 
-    $rootArea = Get-Areas $projectId
-
-    Restore-RootAreaPermissions $projectId $rootArea.identifier
-    if ($rootArea.hasChildren) {
-        foreach ($childArea in $rootArea.children) {
-            Restore-InheritedAreaPermissions $projectId $childArea $rootArea.name "vstfs:///Classification/Node/$($rootArea.identifier)"
-        }
-    }
-}
-
-function Restore-AllGitReposPermissions($projectId) {
-    Write-Host "         All repos"
-
-    $token = "repoV2/$projectId"
-    $acl = Get-AzDOAcl $gitSecNamespaceId $token
-    if ($null -eq $acl) {
-        Write-Host "         WARNING: No ACL found for all Git repos!" -ForegroundColor Yellow
-        return
-    }
-
-    $aces = Remove-NonServerAndTeamIdentities $acl.acesDictionary
-    Set-AzDOAcl $gitSecNamespaceId $token $true $aces
-    Set-AzDOAce $gitSecNamespaceId $token $false "$($Global:readersGroup.IdentityType);$($Global:readersGroup.Descriptor)" $gitAllow
-}
-
-function Restore-GitRepoPermissions($projectId, $repo) {
-    Write-Host "         $($repo.Name)"
-
-    $token = "repoV2/$projectId/$($repo.Id)"
-    $acls = Get-AzDOAcls $gitSecNamespaceId $token
-    foreach ($acl in $acls) {
-        Set-AzDOAcl $gitSecNamespaceId $acl.token $true @{}
-    }
+    $token = Get-RootAreaToken $projectId
+    Restore-HierarchyPermissions $cssSecNamespaceId $token $rootAreaAllow
 }
 
 function Restore-GitPermissions($projectId) {
-    Write-Host "      Git repositories"
+    Write-Host "      Git repositories and project wiki"
 
-    Restore-AllGitReposPermissions $projectId
-
-    $gitRepos = Get-GitRepositories $projectId
-    foreach ($repo in $gitRepos) {
-        Restore-GitRepoPermissions $projectId $repo
-    }
+    $token = "repoV2/$projectId"
+    Restore-HierarchyPermissions $gitSecNamespaceId $token $gitAllow
 }
 
 function Restore-TfvcPermissions($projectInfo) {
     Write-Host "      TFVC repository"
 
-    $token = "`$/$($projectInfo.Name)"
-    $acls = Get-AzDOAcls $tfvcSecNamespaceId $token
-    foreach ($acl in $acls) {
-        if ($acl.token -eq $token) {
-            Set-AzDOAce $tfvcSecNamespaceId $token $true "$($Global:readersGroup.IdentityType);$($Global:readersGroup.Descriptor)" $tfvcAllow
-        } else {
-            Set-AzDOAcl $tfvcSecNamespaceId $acl.token $true @{}
-        }
+    if ($SkipTfvcPermissions) {
+        Write-Host "         skipped"
+        return;
     }
+
+    $token = "`$/$($projectInfo.Name)"
+    Restore-HierarchyPermissions $tfvcSecNamespaceId $token $tfvcAllow
+}
+
+function Restore-QueryFolderPermissions($projectId) {
+    Write-Host "      Query folders"
+
+    $token = Get-SharedQueriesFolderToken $projectId
+    Restore-HierarchyPermissions $queryFoldersSecNamespaceId $token $queryFolderAllow
+}
+
+function Restore-BuildPermissions($projectId) {
+    Write-Host "      Build definitions"
+
+    Restore-HierarchyPermissions $buildSecNamespaceId $projectId $buildAllow
+}
+
+function Restore-ReleasePermissions($projectId) {
+    Write-Host "      Release definitions"
+
+    Restore-HierarchyPermissions $releaseMgmtSecNamespaceId $projectId $releaseAllow
 }
 
 function Restore-DefaultPermissions($projectInfo, $teams) {
@@ -802,6 +862,9 @@ function Restore-DefaultPermissions($projectInfo, $teams) {
     Restore-AreaPermissions $projectInfo.Id
     Restore-GitPermissions $projectInfo.Id
     Restore-TfvcPermissions $projectInfo
+    Restore-QueryFolderPermissions $projectInfo.Id
+    Restore-BuildPermissions $projectInfo.Id
+    Restore-ReleasePermissions $projectInfo.Id
 }
 
 ################################################################################
@@ -819,18 +882,23 @@ if ($selectedProjects.Count -eq 0) {
 }
 
 Write-Host "You are about to remove write permissions for $($selectedProjects.Count) projects." -ForegroundColor Yellow
-if ($RemoveProjectAdmins -and !(Get-SpecialConsent "ATTENTION: You are removing all project administrator permissions! Only collection/organization administrators or server administrators (on-prem) will have access to the projects! Continue?")) {
+if ($RemoveProjectAdmins -and !(Get-SpecialConsent "ATTENTION: You are removing all project administrator permissions! Only collection/organization administrators or server administrators (on-prem) will have write access to the projects! Continue?")) {
     Write-Host "Aborted."
     exit 0
 }
 
 foreach ($p in $selectedProjects) {
-    if (Get-Consent "Are you sure you want to remove write permissions from project '$($p.Name)'?") {
-        Write-Host "   Removing write permissions for project '$($p.Name)'..."
-        if (Move-AllMembersToReaders $p) {
-            if ($FixPermissions) {
-                Restore-DefaultPermissions $p
-            }
+    if (Get-Consent "Are you sure you want to $(if ($RemoveAllAccess) { "fully remove access to" } else { "remove write permissions from" }) project '$($p.Name)'?") {
+        Write-Host "   Removing $(if ($RemoveAllAccess) { "access to" } else { "write permissions for" }) project '$($p.Name)'..."
+
+        $result = $false
+        if ($RemoveAllAccess) {
+            $result = Remove-AllAccess $p
+        } else {
+            $result = Move-AllMembersToReaders $p
+        }
+        if ($result -and $FixPermissions) {
+            Restore-DefaultPermissions $p
         }
     }
 }

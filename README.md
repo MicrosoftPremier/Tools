@@ -11,8 +11,11 @@ Here's a list of all the tools and sample you'll find in this repository grouped
 - **[AzureDevOpsNotificationBanners](./AzureDevOpsNotificationBanners)**  
   This PowerShell module can be used to display notification banners on Team Foundation Server/Azure DevOps Server (>= 2018) and Azure DevOps Services. You might also consider using the [Banner Settings](https://marketplace.visualstudio.com/items?itemName=ms-eswm.banner-settings-hub) extension instead of this PowerShell module.
 
+- **[Get-LatestAzurePipelinesAgent](./Get-LatestAzurePipelinesAgent)**  
+  This PowerShell script downloads the latest version of the Azure Pipelines agent from GitHub for a given target platform, which helps automatically installing the latest agent version or updating to the latest version.
+
 - **[Remove-WritePermissions](./Remove-WritePermissions)**  
-  This PowerShell Core script can be used to remove (most) write permissions from a project. Use it if you want to archive a project and make sure that nobody is able to change its content. The script works by moving all project-level identities/groups to the readers group and - if specified - fixing permissions of readers groups and teams for the project, all areas, and all Git repositories. It currently doesn't fix permissions for other elements like iterations, pipelines, wiki, query folders, or test plans. **Note:** The script has been designed for Team Foundation Server 2018. It should work on 2018.3 and later server versions as well as Azure DevOps Services, but it has only been tested with Team Foundation Server 2018.3.
+  This PowerShell Core script can be used to remove (most) write permissions from a project. Use it if you want to archive a project and make sure that nobody is able to change its content. The script works by moving all project-level identities/groups to the readers group and - if specified - fixing permissions. **Note:** The script has been designed for Team Foundation Server 2018. It should work on 2018.3 and later server versions as well as Azure DevOps Services, but it has only been tested with Team Foundation Server 2018.3.
 
 ### Process Customization
 - **[Get-ProcessChanges](./Get-ProcessChanges)**  
