@@ -8,6 +8,9 @@ Here's a list of all the tools and sample you'll find in this repository grouped
 - **[AzureDevOpsPowerShellTemplate](./AzureDevOpsPowerShellTemplate)**  
   This sample can be used as a template for PowerShell scripts that target Azure DevOps Services or Server. It provides a couple standard parameters that those scripts usually share and some easy to use methods for making REST calls to Azure DevOps that automatically take care of authentication.
 
+- **[AzureDevOpsPowerShellAuthSamples](./AzureDevOpsPowerShellAuthSamples)**  
+  This sample shows how to authenticate against Azure DevOps Services from PowerShell scripts. The sample supports personal access token (PAT), service principal (SP), managed identity (MI), and workload identity federation (OIDC) authentication.
+
 - **[AzureDevOpsNotificationBanners](./AzureDevOpsNotificationBanners)**  
   This PowerShell module can be used to display notification banners on Team Foundation Server/Azure DevOps Server (>= 2018) and Azure DevOps Services. You might also consider using the [Banner Settings](https://marketplace.visualstudio.com/items?itemName=ms-eswm.banner-settings-hub) extension instead of this PowerShell module.
 

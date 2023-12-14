@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package >
+  <metadata>
+    <id>SW4ZF.AzureDevOps</id>
+    <version>0.1.0</version>
+    <authors>ZF Friedrichshafen AG</authors>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <license type="expression">MIT</license>
+    <description>PowerShell module for automating Azure DevOps</description>
+    <copyright>2023, ZF Friedrichshafen AG</copyright>
+    <tags>PowerShell AzureDevOps Automation</tags>
+  </metadata>
+</package>
