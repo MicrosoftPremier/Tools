@@ -249,7 +249,7 @@ function Get-HttpHeadersAndCredentials()
     if ($UsePAT)
     {
         $PAT = Read-Host "Enter PAT" -AsSecureString
-        $patString = "pat:$([System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($PAT)))"
+        $patString = "pat:$(ConvertFrom-SecureString $PAT)"
         $Global:headers["Authorization"] = "Basic $(ConvertTo-Base64String -InputString $patString -Encoding ascii)"
     }
     if ($GetCredentials)
